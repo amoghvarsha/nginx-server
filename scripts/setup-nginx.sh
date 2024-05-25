@@ -10,7 +10,7 @@ handleError() {
 installDependencies() {
     echo "Installing necessary dependencies..."
     apt update || handleError "Failed to update package lists"
-    apt install -y nginx jq curl || handleError "Failed to install dependencies"
+    apt install -y nginx jq curl ufw || handleError "Failed to install dependencies"
     snap install --classic certbot || handleError "Failed to install Certbot"
 }
 
