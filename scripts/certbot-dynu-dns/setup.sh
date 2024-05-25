@@ -2,42 +2,75 @@
 
 set -e  # Exit immediately if a command exits with a non-zero status
 
-AGENTS_PATH=$(realpath "../../../nginx-server-private/agents")
+AGENTS_DIR=$(realpath "../../../nginx-server-private/agents")
 
-SCRIPTS_PATH=$(realpath "./scripts")
-AUTH_HOOK=$(realpath "${SCRIPTS_PATH}/auth_hook.sh")
-CLEANUP_HOOK=$(realpath "${SCRIPTS_PATH}/cleanup_hook.sh")
+SCRIPTS_DIR=$(realpath "./scripts")
+AUTH_HOOK=$(realpath "${SCRIPTS_DIR}/auth_hook.sh")
+CLEANUP_HOOK=$(realpath "${SCRIPTS_DIR}/cleanup_hook.sh")
+
+declare -a AGENTS=()
+declare -a DOMAINS=()
+
+checkRequirements() {
+
+    # Check if realpath command is available
+    if ! command -v realpath &>/dev/null; then
+        echo "Error: 'realpath' command not found. Please make sure it's installed."
+        exit 1
+    fi
+
+}
 
 GetAgents() {
-    AGENTS=("$(ls -d "${AGENTS_PATH}"/*)")
-    AGENTS=("${AGENTS//$'\n'/ }")
-    read -a AGENTS <<< "$AGENTS"
 
+    # Check if the path exists and is a directory
+    if [[ -d "$AGENTS_DIR" ]]; then
 
-    echo "List of DynuDNS Agents: ${AGENTS[@]}"
+        # Initialize the AGENTS array using glob expansion
+        AGENTS=("${AGENTS_DIR}"/*)
+
+        # Print the list of agents in a readable format
+        echo ""
+        echo "List of DynuDNS Agents:"
+        for index in "${!AGENTS[@]}"; do
+            printf "%d. %s\n" "$((index + 1))" "$(basename ${AGENTS[$index]})"
+        done
+    else
+        echo "Error: Path '$AGENTS_DIR' does not exist or is not a directory."
+        exit 1
+    fi
 }
 
 GetDomains() {
 
-    source ./env
+    # Source environment variables
+    source ./env || { echo "Failed to source environment variables"; exit 1; }
 
-    APP_JSON="$(curl -s -X GET "https://api.dynu.com/v2/dns" -H "accept: application/json" -H "API-Key: ${API_KEY}")"
-    if [ $? -ne 0 ]; then
-        echo "Failed to get domains information"
-        exit 1
-    fi
+    # Call Dynu API to get domain information
+    local api_response
+    api_response=$(curl -s -X GET "https://api.dynu.com/v2/dns" -H "accept: application/json" -H "API-Key: ${API_KEY}") || { echo "Failed to get domains information"; exit 1; }
 
-    DOMAINS="$(echo $APP_JSON | jq -r '.domains[].name')"
-    DOMAINS=("${DOMAINS//$'\n'/ }")
+    # Parse JSON response to extract domain names
+    local domain_names
+    domain_names=$(echo "$api_response" | jq -r '.domains[].name') || { echo "Failed to parse domain names"; exit 1; }
 
+    # Convert domain names string to an array
+    DOMAINS=("${domain_names//$'\n'/ }")
     read -a DOMAINS <<< "$DOMAINS"
-    echo "List of Domains: ${DOMAINS[@]}"
+
+    # Print the list of domains
+    echo ""
+    echo "List of Domains:"
+    for domain in "${DOMAINS[@]}"; do
+        echo "$(basename ${domain})"
+    done
 }
 
-Generate() {
+GenerateCertificate() {
     local DOMAIN="${1}"
     local EMAIL="${2}"
-    retries=3
+    local retries=3
+
     for ((i=0; i<retries; i++)); do
         certbot certonly \
             --manual-public-ip-logging-ok \
@@ -57,27 +90,11 @@ Generate() {
     done
 }
 
-GenerateCertificate() {
-    GetAgents
-    echo ""
-    for AGENT in "${AGENTS[@]}"; do
-        cd "${AGENT}" || continue
-        GetDomains
-        echo ""
-        for DOMAIN in "${DOMAINS[@]}"; do
-            echo "Generating Certificate for '${DOMAIN}'"
-            Generate "${DOMAIN}" "${EMAIL}"
-            echo ""
-        done
-        cd "${BASE_DIR}" || exit
-        echo ""
-    done
-}
-
-ForceRenew() {
+ForceRenewCertificate() {
     local DOMAIN="${1}"
     local EMAIL="${2}"
-    retries=3
+    local retries=3
+
     for ((i=0; i<retries; i++)); do
         certbot certonly \
             --force-renew \
@@ -98,20 +115,33 @@ ForceRenew() {
     done
 }
 
-ForceRenewCertificate() {
+GenerateOrRenewCertificates() {
+    
+    local flag="$1"
+
     GetAgents
-    echo ""
+
+    # Generate or force renew certificates for domains
     for AGENT in "${AGENTS[@]}"; do
+        
         cd "${AGENT}" || continue
+        echo ""
+        echo "Getting Domains for '$(basename ${AGENT})'..."
         GetDomains
-        echo ""
+        
         for DOMAIN in "${DOMAINS[@]}"; do
-            echo "Force Renewing Certificate for '${DOMAIN}'"
-            ForceRenew "${DOMAIN}" "${EMAIL}"
             echo ""
+            if [ "$flag" == "generate" ]; then
+                echo "Generating Certificate for '$DOMAIN'"
+                GenerateCertificate "$DOMAIN" "$EMAIL"
+            elif [ "$flag" == "renew" ]; then
+                echo "Force Renewing Certificate for '$DOMAIN'"
+                ForceRenewCertificate "$DOMAIN" "$EMAIL"
+            else
+                echo "Invalid flag: $flag. Use 'generate' or 'renew'."
+                exit 1
+            fi
         done
-        cd "${BASE_DIR}" || exit
-        echo ""
     done
 }
 
@@ -123,11 +153,11 @@ main() {
         select item in "${items[@]}" Quit; do
             case $REPLY in
                 1)
-                    GenerateCertificate
+                    GenerateOrRenewCertificates "generate"
                     break 2
                     ;;
                 2)
-                    ForceRenewCertificate
+                    GenerateOrRenewCertificates "renew"
                     break 2
                     ;;
                 $((${#items[@]}+1)))
@@ -147,7 +177,7 @@ if [ "$(id -u)" != "0" ]; then
     echo "This script must be run as root."
     exit 1
 else
+    checkRequirements
     main
     exit 0
 fi
-

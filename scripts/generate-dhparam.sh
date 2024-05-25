@@ -20,22 +20,34 @@ GetDomains() {
         fi
     done
 
-    echo "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
-    echo "List of DynuDNS DOMAINS: ${DOMAINS[@]}"
-    echo "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
     echo
+    # Print the list of domains
+    echo "List of DynuDNS DOMAINS:"
+    for domain in "${DOMAINS[@]}"; do
+        echo "- $domain"
+    done
 }
+
 
 Generate() {
     local domain="$1"
 
+    echo
     echo "Generating dhparam key for ${domain}"
 
     head -c 1 </dev/urandom > /dev/null
 
-    openssl dhparam -out ${TMP_DHPARAM_FILE} 4096
+    # Generate the DH parameters, capturing the return status
+    local dhparam_status
+    dhparam_status=$(openssl dhparam -out ${TMP_DHPARAM_FILE} 4096 2>&1)
 
-    echo "Done!"
+    # Check the return status and print the appropriate message
+    if [ $? -eq 0 ]; then
+        echo "DH parameters generated successfully."
+    else
+        echo "Failed to generate DH parameters: $dhparam_status"
+        exit 1
+    fi
 }
 
 Move() {
@@ -71,10 +83,10 @@ main() {
         local src_dhparam_file="${domain_archive_dir}/dhparam${index}.pem"
         local dst_dhparam_file="${domain_live_dir}/dhparam.pem"
 
+        echo
         echo "DOMAIN: ${domain}"
         echo "SRC DHPARAM FILE: ${src_dhparam_file}"
         echo "DST DHPARAM FILE: ${dst_dhparam_file}"
-        echo
 
         Generate "${domain}"
         Move "${domain}" "${src_dhparam_file}" "${dst_dhparam_file}"

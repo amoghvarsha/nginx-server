@@ -2,7 +2,7 @@
 
 set -e  # Exit immediately if a command exits with a non-zero status
 
-check_requirements() {
+checkRequirements() {
     # Check if openssl is available
     if ! command -v openssl &> /dev/null; then
         echo "openssl could not be found. Please install openssl and try again."
@@ -52,6 +52,7 @@ if [ "$(id -u)" != "0" ]; then
     echo "This script must be run as root."
     exit 1
 else
+    checkRequirements
     main
     exit 0
 fi
