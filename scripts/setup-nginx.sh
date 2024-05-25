@@ -7,31 +7,31 @@ if [ "$(id -u)" != "0" ]; then
 fi
 
 # Function to handle errors
-handle_error() {
+handleError() {
     echo "Error: $1"
     exit 1
 }
 
 # Function to install necessary dependencies
-install_dependencies() {
+installDependencies() {
     echo "Installing necessary dependencies..."
-    apt update || handle_error "Failed to update package lists"
-    apt install -y nginx jq curl || handle_error "Failed to install dependencies"
-    snap install --classic certbot || handle_error "Failed to install Certbot"
+    apt update || handleError "Failed to update package lists"
+    apt install -y nginx jq curl || handleError "Failed to install dependencies"
+    snap install --classic certbot || handleError "Failed to install Certbot"
 }
 
 # Function to configure UFW
-configure_ufw() {
+configureUFW() {
     echo "Configuring UFW..."
-    ufw allow OpenSSH comment "Allow OpenSSH" || handle_error "Failed to allow OpenSSH through UFW"
-    ufw allow 'Nginx Full' comment "Allow Nginx" || handle_error "Failed to allow Nginx through UFW"
-    ufw enable || handle_error "Failed to enable UFW"
+    ufw allow OpenSSH comment "Allow OpenSSH" || handleError "Failed to allow OpenSSH through UFW"
+    ufw allow 'Nginx Full' comment "Allow Nginx" || handleError "Failed to allow Nginx through UFW"
+    ufw enable || handleError "Failed to enable UFW"
 }
 
 # Main function
 main() {
-    install_dependencies
-    configure_ufw
+    installDependencies
+    configureUFW
     echo "Setup completed successfully."
 }
 
