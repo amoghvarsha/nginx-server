@@ -1,4 +1,4 @@
-#!/bin/bash
+result_create#!/bin/bash
 
 source ./env # Load the API_KEY
 
@@ -25,12 +25,12 @@ record_data=$(jq -n --arg nodeName "_acme-challenge" --arg textData "$CERTBOT_VA
     textData: $textData
 }')
 
-resultCreate=$(curl -s -X POST "https://api.dynu.com/v2/dns/$domainID/record" -H "accept: application/json" -H "Content-Type: application/json" -d "$record_data" -H "API-Key: $API_KEY")
+result_create=$(curl -s -X POST "https://api.dynu.com/v2/dns/$domainID/record" -H "accept: application/json" -H "Content-Type: application/json" -d "$record_data" -H "API-Key: $API_KEY")
 if [ $? -ne 0 ]; then
     echo "Failed to create DNS record"
     exit 1
 fi
 
-echo $resultCreate
+echo $result_create
 
 sleep 30

@@ -86,14 +86,11 @@ main() {
     rm -f "${TMP_DHPARAM_FILE}"
 }
 
-if [ "$EUID" -ne 0 ]
-then
-    echo "Please run as root"
-
-    exit 2
-
+# Check if the script is run as root
+if [ "$(id -u)" != "0" ]; then
+    echo "This script must be run as root."
+    exit 1
 else
     main
-
     exit 0
 fi

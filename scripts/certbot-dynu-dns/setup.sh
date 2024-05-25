@@ -1,10 +1,12 @@
 #!/bin/bash
 
+set -e  # Exit immediately if a command exits with a non-zero status
+
+AGENTS_PATH=$(realpath "../../../nginx-server-private/agents")
+
 SCRIPTS_PATH=$(realpath "./scripts")
 AUTH_HOOK=$(realpath "${SCRIPTS_PATH}/auth_hook.sh")
 CLEANUP_HOOK=$(realpath "${SCRIPTS_PATH}/cleanup_hook.sh")
-
-AGENTS_PATH=$(realpath "../../../nginx-server-private/agents")
 
 GetAgents() {
     AGENTS=("$(ls -d "${AGENTS_PATH}"/*)")
@@ -16,7 +18,9 @@ GetAgents() {
 }
 
 GetDomains() {
+
     source ./env
+
     APP_JSON="$(curl -s -X GET "https://api.dynu.com/v2/dns" -H "accept: application/json" -H "API-Key: ${API_KEY}")"
     if [ $? -ne 0 ]; then
         echo "Failed to get domains information"
@@ -25,6 +29,7 @@ GetDomains() {
 
     DOMAINS="$(echo $APP_JSON | jq -r '.domains[].name')"
     DOMAINS=("${DOMAINS//$'\n'/ }")
+
     read -a DOMAINS <<< "$DOMAINS"
     echo "List of Domains: ${DOMAINS[@]}"
 }
@@ -137,10 +142,12 @@ main() {
     done
 }
 
-if [ "$EUID" -ne 0 ]; then
-    echo "Please run as root"
-    exit 2
+# Check if the script is run as root
+if [ "$(id -u)" != "0" ]; then
+    echo "This script must be run as root."
+    exit 1
 else
     main
     exit 0
 fi
+
