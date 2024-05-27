@@ -1,4 +1,4 @@
-result_create#!/bin/bash
+#!/bin/bash
 
 source ./env # Load the API_KEY
 
